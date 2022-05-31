@@ -38,6 +38,7 @@ class Player(pygame.sprite.Sprite):
         # horizotal movement
         self.velocity.x = dir
         self.rect.x += self.velocity.x * self.speed
+
         
     def gravity(self):
         #constant gravity
@@ -48,9 +49,10 @@ class Player(pygame.sprite.Sprite):
 
         #check if grounded
     def jump(self):
-        if not self.isGrounded and self.jumps == 0: return
+        if not self.isGrounded and self.jumps == 0: return 0
         self.velocity.y = self.jmpForce
         self.jumps -= 1
+        return self.jmpForce
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
@@ -69,6 +71,8 @@ class LevelHandler:
 
         self.jumpPressed = False
         self.levelTime = 0
+
+        self.v = 0
 
     def loadLevel(self, level):
         level = min(level, len(maps))
@@ -162,37 +166,35 @@ class LevelHandler:
         self.finish.update(self.dir, self.player.speed)
         self.coins.update(self.dir, self.player.speed)
 
-        
-
-        """if self.player.rect.y < 100 and not self.player.isGrounded:
-            for b in self.blocks:
-                b.updateY(self.player.velocity.y)
-            for s in self.spikes:
-                s.updateY(self.player.velocity.y)
-            for c in self.coins:
-                c.updateY(self.player.velocity.y)
-            for f in self.finish:
-                f.updateY(self.player.velocity.y)
-            print(self.player.velocity.y)"""
-
-        # move world verticlay
-        if self.player.rect.y < 100 and not self.player.isGrounded:
-
-            for b in self.blocks:
-                b.updateY(-10 if self.player.velocity.y < 0 else self.player.velocity.y)
-        elif self.player.rect.y > 100 and not self.player.isGrounded:
-            for b in self.blocks:
-                b.updateY(self.player.velocity.y)
 
     def gravityMovement(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_UP] and not self.jumpPressed:
-            self.player.jump()
+            self.v += self.player.jump()
             self.jumpPressed = True
 
         if not keys[pygame.K_UP]:
             self.jumpPressed = False
-        self.player.gravity()
+            
+        # normal
+        if self.player.rect.y > 100:
+            self.player.gravity()
+            self.v = self.player.velocity.y
+
+        # world movement
+        elif self.player.rect.y <= 100 and not self.player.isGrounded:
+            self.player.rect.y = 100
+
+            self.v += self.player.gForce
+            self.verticalCollisions()
+
+            for b in self.blocks:
+                b.updateY(self.v)
+
+            if list(self.blocks)[0].isLowest():
+                self.player.velocity.y = self.v
+                self.player.gravity()
+        
 
         # fall of the map
         if self.player.rect.y > WIDTH:
@@ -213,15 +215,17 @@ class LevelHandler:
 
         for block in self.blocks.sprites():
             if block.rect.colliderect(self.player.rect):
-                if self.player.velocity.y > 0: # down
+                if self.player.velocity.y > 0 or self.v > 0: # down    
                     self.player.rect.bottom = block.rect.top
 
                     self.player.velocity.y = 0
+                    self.v = 0
                     self.player.isGrounded = True
                     self.player.jumps = self.player.maxJumps
                     
                 # results in problem when jumping at the right moment, it will think you hit the block from below, because your velocity is pointing up
-                elif self.player.velocity.y < 0 and block.rect.bottom > self.player.rect.top: # up
+                elif (self.player.velocity.y < 0 or self.v < 0) and block.rect.bottom > self.player.rect.top: # up
+                    self.player.isGrounded = True
                     self.player.rect.top = block.rect.bottom
                     self.player.velocity.y = 0
                     

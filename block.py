@@ -11,12 +11,18 @@ class Block(pygame.sprite.Sprite):
         self.image.fill((255, 255, 255))
         self.rect = self.image.get_rect(topleft=pos)
 
+    def isLowest(self):
+        return abs(self.originalPos[1]-self.rect.y) < 10
+
     def update(self, dir, speed):
         # world move
         self.rect.x -= speed*dir
 
     def updateY(self, speed):
-        if self.originalPos[1] > self.rect.y - speed: return
+        if self.originalPos[1] > self.rect.y - speed: 
+            self.rect.y = self.originalPos[1]
+            return
+            
         self.rect.y -= speed
 
 # inheritance heisst, dass mer eifach alli funktione vom parent class übernimmt und override chan
